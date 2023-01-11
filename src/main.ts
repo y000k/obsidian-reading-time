@@ -1,4 +1,4 @@
-import { TFile, TAbstractFile, Plugin, moment, Notice, Platform } from 'obsidian';
+import { TFile, TAbstractFile, Plugin, moment, Notice, Platform, requireApiVersion } from 'obsidian';
 import { createDailyNote, getDailyNoteSettings } from 'obsidian-daily-notes-interface';
 import { Subject } from 'rxjs';
 import { debounceTime, filter, groupBy, map, mergeMap, tap } from 'rxjs/operators';
@@ -123,22 +123,19 @@ export default class RecordDurationPlugin extends Plugin {
 
 		let dif = this.endTime.diff(this.startTime, 'minutes');
 		if (dif >= this.settings.minDuration) {
-			if (this.lastRule.recordinsourcefile && Platform.isDesktopApp) {
-				app.fileManager.processFrontMatter(file, (frontmatter) => {
-					const orgi_value = frontmatter[this.lastRule.key3];
-					if (orgi_value != null) {
-						frontmatter[this.lastRule.key3] = orgi_value + dif;
-					} else {
-						frontmatter[this.lastRule.key3] = dif;
-					}
-				});
-			}
-			if (this.lastRule.recordinsourcefile && Platform.isMobileApp) {
-				const ye = (<any>app).plugins.plugins.yamledit
-				if (ye == null) {
-					new Notice("缺少yamledit插件，无法在Mobile上更新源文件FrontMatter！")
-				} else {
-					const { getYamlEditApi } = ye.api
+			if (this.lastRule.recordinsourcefile) {
+				if (requireApiVersion("1.1.0")) {
+					app.fileManager.processFrontMatter(file, (frontmatter) => {
+						const orgi_value = frontmatter[this.lastRule.key3];
+						if (orgi_value != null) {
+							frontmatter[this.lastRule.key3] = orgi_value + dif;
+						} else {
+							frontmatter[this.lastRule.key3] = dif;
+						}
+					});
+				}
+				else if ((<any>app).plugins.plugins.yamledit) {
+					const { getYamlEditApi } = (<any>app).plugins.plugins.yamledit.api
 					const yamlApi = await getYamlEditApi(file)
 					const orgi_value = yamlApi.get(this.lastRule.key3)
 					if (orgi_value != null) {
@@ -147,6 +144,9 @@ export default class RecordDurationPlugin extends Plugin {
 						yamlApi.set(this.lastRule.key3, dif)
 					}
 					yamlApi.update()
+				}
+				else {
+					new Notice("缺少yamledit插件，无法在Mobile上更新源文件FrontMatter！")
 				}
 			}
 			if (this.lastRule.recordindailyfile) {
