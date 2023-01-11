@@ -1,4 +1,4 @@
-import { TFile, TAbstractFile, Plugin, moment, Notice } from 'obsidian';
+import { TFile, TAbstractFile, Plugin, moment, Notice, Platform } from 'obsidian';
 import { createDailyNote, getDailyNoteSettings } from 'obsidian-daily-notes-interface';
 import { Subject } from 'rxjs';
 import { debounceTime, filter, groupBy, map, mergeMap, tap } from 'rxjs/operators';
@@ -38,6 +38,9 @@ export default class RecordDurationPlugin extends Plugin {
 
 	setupOnFileOpenHandler() {
 		this.app.workspace.on('file-open', async (file) => {
+			// console.warn(app.workspace.getLeaf().view.getState())
+			// workspace.activeLeaf.view.currentTitle
+			// app.workspace.containerEl.childNodes[2].childNodes[1].childNodes[1].childNodes[0].childNodes[1].ariaLabel
 			if (this.lastFile != null) {
 				this.statusBarItemEl.setText("");
 				this.lastRule = this.settings.rules.filter((fp) => {
@@ -120,7 +123,7 @@ export default class RecordDurationPlugin extends Plugin {
 
 		let dif = this.endTime.diff(this.startTime, 'minutes');
 		if (dif >= this.settings.minDuration) {
-			if (this.lastRule.recordinsourcefile) {
+			if (this.lastRule.recordinsourcefile && Platform.isDesktopApp) {
 				app.fileManager.processFrontMatter(file, (frontmatter) => {
 					const orgi_value = frontmatter[this.lastRule.key3];
 					if (orgi_value != null) {
@@ -129,6 +132,22 @@ export default class RecordDurationPlugin extends Plugin {
 						frontmatter[this.lastRule.key3] = dif;
 					}
 				});
+			}
+			if (this.lastRule.recordinsourcefile && Platform.isMobileApp) {
+				const ye = (<any>app).plugins.plugins.yamledit
+				if (ye == null) {
+					new Notice("缺少yamledit插件，无法在Mobile上更新源文件FrontMatter！")
+				} else {
+					const { getYamlEditApi } = ye.api
+					const yamlApi = await getYamlEditApi(file)
+					const orgi_value = yamlApi.get(this.lastRule.key3)
+					if (orgi_value != null) {
+						yamlApi.set(this.lastRule.key3, orgi_value + dif);
+					} else {
+						yamlApi.set(this.lastRule.key3, dif)
+					}
+					yamlApi.update()
+				}
 			}
 			if (this.lastRule.recordindailyfile) {
 				const { format, folder } = getDailyNoteSettings();
@@ -141,12 +160,13 @@ export default class RecordDurationPlugin extends Plugin {
 				const dailyFile = app.vault.getAbstractFileByPath(dailyName) as TFile;
 				const dailyContent = await app.vault.read(dailyFile);
 				let newDaliy = `${dailyContent}`;
-				newDaliy = updateKeyInContent(
+				let newDaliy1 = updateKeyInContent(
 					newDaliy,
 					this.lastRule.key1,
 					dif.toString(),
 				);
-				await this.app.vault.modify(dailyFile, newDaliy);
+				if (newDaliy == newDaliy1) new Notice("目标文件中无关键字！"); else
+					await this.app.vault.modify(dailyFile, newDaliy1);
 			}
 			if (this.lastRule.recordintargetfile) {
 				const format = this.lastRule.target;
@@ -159,12 +179,13 @@ export default class RecordDurationPlugin extends Plugin {
 				const targetFile = app.vault.getAbstractFileByPath(dailyName) as TFile;
 				const fileContent = await app.vault.read(targetFile);
 				let newFile = `${fileContent}`;
-				newFile = updateKeyInContent(
+				let newFile1 = updateKeyInContent(
 					newFile,
 					this.lastRule.key2,
 					dif.toString(),
 				);
-				await this.app.vault.modify(targetFile, newFile);
+				if (newFile == newFile1) new Notice("目标文件中无关键字！"); else
+					await this.app.vault.modify(targetFile, newFile1);
 			}
 		}
 		this.log('阅读了 ' + dif.toString() + " 分钟。", file);

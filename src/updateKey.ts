@@ -3,7 +3,7 @@ export const updateKeyInContent = (
   key: string,
   newValue: string,
 ) => {
-  var rgx = new RegExp('^'+key + "::(\\d+)",'m');
+  var rgx = new RegExp('^' + key + "::(\\d+)", 'm');
   const foundContentMatch = rgx.exec(content)
   if (foundContentMatch != null) {
     var org_value = foundContentMatch![1]
@@ -26,7 +26,7 @@ export const updateKeyInFrontMatter = (
   key: string,
   newValue: string,
 ) => {
-  var rgx = new RegExp(key + ": (\\d+)", "g");
+  var rgx = new RegExp('^' + key + ": ?(\\d+)", "m");
   const foundContentMatch = rgx.exec(content)
   var org_value = foundContentMatch![1]
   var result = content.replace(rgx, key + ": " + (parseInt(newValue) + parseInt(org_value)))
